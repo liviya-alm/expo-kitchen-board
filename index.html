@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EXPO: Command the Rush</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+:root{
+  --bg:oklch(15% .012 25); --panel:oklch(21% .016 25); --line:oklch(31% .02 25);
+  --text:oklch(97% .008 80); --muted:oklch(76% .02 60);
+  --calm:oklch(79% .19 150); --warn:oklch(85% .17 80); --late:oklch(65% .24 27);
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Barlow,Arial,sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column}
+button{font-family:inherit;touch-action:manipulation;cursor:pointer}
+.display{font-family:"Bebas Neue",Impact,sans-serif;font-weight:400;letter-spacing:.02em}
+.btn{min-height:96px;padding:0 32px;border:none;border-radius:18px;background:var(--text);color:oklch(15% .012 25);font-size:32px;font-weight:800;text-transform:uppercase}
+.btn:active,.item:active,.complete:active,.bin:active,.preset:active,.tbl:active,.mi:active,.mminus:active,#sound-btn:active{transform:scale(.97)}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:calc(14px + var(--safe-top)) 24px 16px;border-bottom:2px solid var(--line)}
+header h1{margin:0;font-size:84px;line-height:.9}
+header h1 small{display:block;font-size:30px;letter-spacing:.08em;color:var(--muted)}
+.head-btns{display:flex;gap:12px;align-items:center}
+#sound-btn{min-height:96px;padding:0 24px;border:3px solid var(--line);border-radius:18px;background:transparent;color:var(--text);font-size:26px;font-weight:800;text-transform:uppercase}
+#sound-btn.off{color:var(--muted)}
+
+#board{flex:1;overflow:auto;padding:20px 24px 150px;display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px;align-content:start}
+
+.card{background:var(--panel);border:8px solid var(--line);border-radius:22px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.card.calm{border-color:var(--calm)}
+.card.warn{border-color:var(--warn);animation:glowWarn 1.8s ease-in-out infinite}
+.card.late{border-color:var(--late);background:oklch(23% .07 27);animation:pulseLate .9s ease-in-out infinite}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ticket{font-size:110px;line-height:.85}
+.card.late .ticket{font-size:130px}
+.timer{font-size:84px;line-height:.85;font-variant-numeric:tabular-nums;color:var(--calm)}
+.card.warn .timer{color:var(--warn)}
+.card.late .timer{color:var(--late);animation:shake .5s linear infinite}
+
+.timebar{height:44px;background:oklch(12% .01 25);border-radius:22px;overflow:hidden;border:3px solid var(--line)}
+.timefill{height:100%;width:100%;background:var(--calm);transition:background .3s}
+.card.warn .timefill{background:var(--warn)}
+.card.late .timefill{background:var(--late);animation:flash .5s linear infinite}
+
+.segments{display:flex;gap:6px;height:30px}
+.segments i{flex:1;border-radius:6px;background:oklch(28% .02 25);transition:background .3s}
+.segments i.on{background:var(--calm)}
+
+.items{display:flex;flex-direction:column;gap:10px}
+.item{width:100%;min-height:92px;border:none;border-radius:16px;background:oklch(27% .02 25);color:var(--text);font-size:34px;font-weight:600;text-align:left;padding:10px 18px;display:flex;align-items:center;gap:18px}
+.item .box{flex:none;width:50px;height:50px;border:4px solid var(--text);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800}
+.item.done{background:oklch(32% .07 150);color:oklch(90% .08 150);text-decoration:line-through}
+.item.done .box{background:var(--calm);border-color:var(--calm);color:oklch(15% .012 25)}
+
+.actions{display:flex;gap:12px}
+.complete{flex:1;min-height:108px;border:none;border-radius:18px;background:var(--calm);color:oklch(15% .012 25);font-family:"Bebas Neue",Impact,sans-serif;font-size:60px;letter-spacing:.04em}
+.bin{min-width:108px;min-height:108px;border:3px solid var(--line);border-radius:18px;background:transparent;color:var(--muted);font-size:46px;font-weight:800}
+
+#toast{position:fixed;left:50%;bottom:calc(20px + var(--safe-bottom));transform:translate(-50%,240%);transition:transform .35s cubic-bezier(.2,.7,.2,1);display:flex;align-items:center;gap:18px;background:var(--text);color:oklch(15% .012 25);padding:12px 12px 12px 28px;border-radius:20px;font-size:30px;font-weight:800;max-width:calc(100% - 32px);box-shadow:0 14px 40px oklch(0% 0 0 / .5);z-index:5}
+#toast.show{transform:translate(-50%,0)}
+#undo{min-height:84px;min-width:150px;border:none;border-radius:14px;background:oklch(15% .012 25);color:var(--text);font-family:"Bebas Neue",Impact,sans-serif;font-size:44px;letter-spacing:.04em}
+
+#modal{position:fixed;inset:0;background:oklch(10% .01 25 / .85);display:none;padding:16px;z-index:10;overflow-y:auto}
+#modal.show{display:flex}
+.sheet{margin:auto;background:var(--panel);border:3px solid var(--line);border-radius:26px;padding:22px;width:min(760px,100%);display:flex;flex-direction:column;gap:14px}
+.sheet.bad{animation:shake .4s linear 2}
+.sheet label{display:block;font-size:22px;font-weight:800;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.tables{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.tbl{min-height:76px;border:3px solid var(--line);border-radius:14px;background:transparent;color:var(--text);font-family:"Bebas Neue",Impact,sans-serif;font-size:46px}
+.tbl.on{background:var(--calm);color:oklch(15% .012 25);border-color:var(--calm)}
+.menu-cat{font-family:"Bebas Neue",Impact,sans-serif;font-size:30px;color:var(--muted);margin:8px 0 4px;letter-spacing:.04em}
+.menu-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.mi-wrap{display:flex;border:3px solid var(--line);border-radius:14px;background:oklch(18% .014 25);overflow:hidden}
+.mi-wrap.on{border-color:var(--calm)}
+.mi{flex:1;min-height:76px;border:none;background:transparent;color:var(--text);font-size:26px;font-weight:800;text-align:left;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.qty{font-family:"Bebas Neue",Impact,sans-serif;font-size:44px;color:var(--calm);min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
+.mminus{width:76px;border:none;border-left:3px solid var(--line);background:transparent;color:var(--late);font-size:44px;font-weight:800}
+.summary{font-size:24px;font-weight:800;color:var(--muted);min-height:30px;margin:0}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.preset{min-height:76px;border:3px solid var(--line);border-radius:16px;background:transparent;color:var(--text);font-family:"Bebas Neue",Impact,sans-serif;font-size:52px}
+.preset.on{background:var(--text);color:oklch(15% .012 25);border-color:var(--text)}
+.err{min-height:30px;font-size:26px;font-weight:800;color:var(--late);margin:0}
+.sheet-actions{display:flex;gap:12px}
+.sheet-actions .btn{flex:1}
+#cancel{background:transparent;color:var(--text);border:3px solid var(--line)}
+
+@keyframes glowWarn{0%,100%{box-shadow:0 0 0 0 oklch(85% .17 80 / 0)}50%{box-shadow:0 0 36px 6px oklch(85% .17 80 / .45)}}
+@keyframes pulseLate{0%,100%{box-shadow:0 0 0 0 oklch(65% .24 27 / 0)}50%{box-shadow:0 0 48px 12px oklch(65% .24 27 / .8)}}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media (prefers-reduced-motion: reduce){ .card,.timefill,.timer,.sheet{animation:none!important} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="display">EXPO<small>COMMAND THE RUSH</small></h1>
+  <div class="head-btns">
+    <button id="sound-btn">Sound on</button>
+    <button class="btn" id="add-btn">+ Order</button>
+  </div>
+</header>
+
+<main id="board" aria-live="polite"></main>
+
+<div id="toast" role="status">
+  <span id="toast-msg"></span>
+  <button id="undo">UNDO</button>
+</div>
+
+<div id="modal">
+  <div class="sheet" id="sheet">
+    <div>
+      <label>TABLE</label>
+      <div class="tables" id="tables"></div>
+    </div>
+    <div>
+      <label>MENU, TAP TO ADD · − TO REMOVE</label>
+      <div id="menu"></div>
+    </div>
+    <p class="summary" id="summary"></p>
+    <div>
+      <label>TARGET COMPLETION TIME</label>
+      <div class="presets" id="presets">
+        <button class="preset" data-min="5">5</button>
+        <button class="preset on" data-min="10">10</button>
+        <button class="preset" data-min="15">15</button>
+        <button class="preset" data-min="20">20</button>
+      </div>
+    </div>
+    <p class="err" id="err"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="cancel">Cancel</button>
+      <button class="btn" id="create">Add order</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WARN_RATIO = 0.25; // warning when a quarter of the target time is left (adjustable)
+const TABLE_COUNT = 12;
+const MAX_UNITS = 20;    // maximum total portions per order
+// Sample menu. Edit or extend these lists to match your kitchen.
+const MENU = [
+  {cat: 'Starters', items: ['Garlic bread', 'Caesar salad', 'Onion rings', 'Chicken wings']},
+  {cat: 'Mains',    items: ['Burger', 'Margherita pizza', 'Carbonara', 'Steak', 'Fish and chips']},
+  {cat: 'Sides',    items: ['Fries', 'Mashed potato', 'Side salad']},
+  {cat: 'Drinks',   items: ['Coffee', 'Flat white', 'Iced coffee', 'Lemonade']},
+  {cat: 'Desserts', items: ['Tiramisu', 'Pancakes', 'Brownie']}
+];
+
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const hasGsap = typeof window.gsap !== 'undefined';
+const $ = s => document.querySelector(s);
+let orders = [], seq = 1, undoFn = null, toastT = null, sig = '', draftMin = 10;
+let draft = {table: null, counts: {}};   // counts: { 'Burger': 2, 'Fries': 1 }
+let soundOn = true, audioCtx = null;
+const alerted = new Set();
+
+// ---------- Sound engine (generated in the browser, no files needed) ----------
+function getAudio(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+document.addEventListener('pointerdown', getAudio, {once: true});
+
+function tone(freq, dur, type = 'sine', when = 0, vol = .15, endFreq, bucket){
+  if (!soundOn) return;
+  const c = getAudio(), t = c.currentTime + when;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g).connect(c.destination);
+  o.start(t);
+  o.stop(t + dur + .02);
+  if (bucket) bucket.push(o);
+}
+const beep = (...a) => tone(...a);
+
+function speak(text){
+  if (!soundOn || !('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1; u.pitch = 1; u.volume = 1;
+  speechSynthesis.speak(u);
+}
+
+// 20-second bell for new orders
+const ringNodes = [];
+function stopRing(){
+  ringNodes.forEach(o => { try { o.stop(); } catch (e) {} });
+  ringNodes.length = 0;
+}
+function startRing(){
+  stopRing();
+  for (let s = 0; s < 20; s++) {
+    tone(1046, .9, 'sine', s, .16, null, ringNodes);
+    tone(1318, .9, 'sine', s, .10, null, ringNodes);
+  }
+}
+
+// Continuous alarm while any order is late
+let alarmTimer = null;
+function alarmPulse(){
+  tone(880, .35, 'square', 0, .12, 660);
+  tone(880, .35, 'square', .45, .12, 660);
+}
+function startAlarm(){
+  if (alarmTimer || !soundOn) return;
+  alarmPulse();
+  alarmTimer = setInterval(alarmPulse, 1200);
+}
+function stopAlarm(){
+  clearInterval(alarmTimer);
+  alarmTimer = null;
+}
+function syncAlarm(){
+  if (orders.some(o => stateOf(o) === 'late')) startAlarm(); else stopAlarm();
+}
+
+const SFX = {
+  tick:     () => beep(880, .06, 'sine', 0, .12),
+  complete: () => { beep(523, .12, 'triangle', 0, .18); beep(784, .18, 'triangle', .1, .18); },
+  remove:   () => beep(260, .14, 'triangle', 0, .18, 140),
+  undo:     () => beep(660, .1, 'sine', 0, .14, 440),
+  add:      () => startRing(),
+  late: table => {
+    for (let i = 0; i < 3; i++) beep(440, .18, 'square', i * .25, .1);
+    setTimeout(() => speak('Table ' + table + ' is late'), 900);
+  }
+};
+
+$('#sound-btn').addEventListener('click', () => {
+  soundOn = !soundOn;
+  const b = $('#sound-btn');
+  b.textContent = soundOn ? 'Sound on' : 'Sound off';
+  b.classList.toggle('off', !soundOn);
+  if (soundOn) { SFX.tick(); speak('Sound on'); syncAlarm(); }
+  else {
+    stopAlarm(); stopRing();
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
+});
+
+// ---------- Animation helper ----------
+const animate = (target, from, to) => {
+  if (!reduce && hasGsap && target) gsap.fromTo(target, from, to);
+};
+
+// ---------- Order logic ----------
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const remain = o => o.due - Date.now();
+const stateOf = o => {
+  const r = remain(o);
+  if (r <= 0) return 'late';
+  return r <= o.total * WARN_RATIO ? 'warn' : 'calm';
+};
+const timerText = o => {
+  const ms = remain(o), late = ms < 0, s = Math.floor(Math.abs(ms) / 1000);
+  return (late ? '+' : '') + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+};
+const sorted = () => [...orders].sort((a, b) => remain(a) - remain(b));
+const makeSig = () => sorted().map(o => o.id + stateOf(o)).join('|');
+const timeFrac = o => Math.max(0, Math.min(1, remain(o) / o.total));
+
+function checkLate(silent){
+  orders.forEach(o => {
+    if (stateOf(o) === 'late') {
+      if (!alerted.has(o.id)) { alerted.add(o.id); if (!silent) SFX.late(o.table); }
+    } else {
+      alerted.delete(o.id);
+    }
+  });
+}
+
+function cardHTML(o){
+  const st = stateOf(o);
+  const segs = o.items.map(i => `<i class="${i.done ? 'on' : ''}"></i>`).join('');
+  const items = o.items.map((it, idx) =>
+    `<button class="item${it.done ? ' done' : ''}" data-act="item" data-id="${o.id}" data-idx="${idx}">
+       <span class="box">${it.done ? '✓' : ''}</span><span>${esc(it.text)}</span>
+     </button>`).join('');
+  return `<article class="card ${st}" data-card="${o.id}">
+    <div class="top">
+      <div class="ticket display">T${esc(o.table)}</div>
+      <div class="timer display" data-timer="${o.id}">${timerText(o)}</div>
+    </div>
+    <div class="timebar"><div class="timefill" data-time="${o.id}" style="width:${st==='late'?100:timeFrac(o)*100}%"></div></div>
+    <div class="segments">${segs}</div>
+    <div class="items">${items}</div>
+    <div class="actions">
+      <button class="complete" data-act="complete" data-id="${o.id}">Complete</button>
+      <button class="bin" data-act="remove" data-id="${o.id}" aria-label="Remove order">✕</button>
+    </div>
+  </article>`;
+}
+
+function render(){
+  $('#board').innerHTML = sorted().map(cardHTML).join('');
+  sig = makeSig();
+}
+
+function flipRender(){
+  const first = {};
+  document.querySelectorAll('[data-card]').forEach(el => first[el.dataset.card] = el.getBoundingClientRect());
+  render();
+  syncAlarm();
+  if (reduce || !hasGsap) return;
+  document.querySelectorAll('[data-card]').forEach(el => {
+    const f = first[el.dataset.card];
+    if (!f) { gsap.from(el, {opacity: 0, y: 40, duration: .45, ease: 'power3.out'}); return; }
+    const l = el.getBoundingClientRect(), dx = f.left - l.left, dy = f.top - l.top;
+    if (dx || dy) gsap.fromTo(el, {x: dx, y: dy}, {x: 0, y: 0, duration: .55, ease: 'power3.out'});
+  });
+}
+
+function tick(){
+  checkLate(false);
+  syncAlarm();
+  if (makeSig() !== sig) { flipRender(); return; }
+  orders.forEach(o => {
+    const t = document.querySelector(`[data-timer="${o.id}"]`);
+    if (t) t.textContent = timerText(o);
+    const el = document.querySelector(`[data-time="${o.id}"]`);
+    if (el && stateOf(o) !== 'late') el.style.width = (timeFrac(o) * 100) + '%';
+  });
+}
+
+function showUndo(msg, fn){
+  undoFn = () => { fn(); SFX.undo(); flipRender(); hideToast(); };
+  $('#toast-msg').textContent = msg;
+  $('#toast').classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(hideToast, 6000);
+}
+function hideToast(){ $('#toast').classList.remove('show'); undoFn = null; }
+$('#undo').addEventListener('click', () => { if (undoFn) undoFn(); });
+
+function removeOrder(o, msg){
+  const idx = orders.indexOf(o);
+  orders.splice(idx, 1);
+  flipRender();
+  showUndo(msg, () => { orders.splice(Math.min(idx, orders.length), 0, o); });
+}
+
+$('#board').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const o = orders.find(x => x.id === +b.dataset.id);
+  if (!o) return;
+  if (b.dataset.act === 'item') {
+    const idx = +b.dataset.idx, it = o.items[idx];
+    it.done = !it.done;
+    SFX.tick();
+    flipRender();
+    const box = document.querySelector(`[data-card="${o.id}"] [data-idx="${idx}"] .box`);
+    animate(box, {scale: .4}, {scale: 1, duration: .35, ease: 'power3.out'});
+    showUndo((it.done ? 'Ticked: ' : 'Unticked: ') + it.text, () => { it.done = !it.done; });
+  } else if (b.dataset.act === 'complete') {
+    SFX.complete();
+    removeOrder(o, 'Completed T' + o.table);
+  } else if (b.dataset.act === 'remove') {
+    SFX.remove();
+    removeOrder(o, 'Removed T' + o.table);
+  }
+});
+
+// ---------- Add order sheet: tap a table, tap menu items as many times as needed ----------
+const totalUnits = () => Object.values(draft.counts).reduce((a, b) => a + b, 0);
+
+function buildSheet(){
+  $('#tables').innerHTML = Array.from({length: TABLE_COUNT}, (_, i) =>
+    `<button class="tbl" data-table="${i + 1}">${i + 1}</button>`).join('');
+  $('#menu').innerHTML = MENU.map(group =>
+    `<div class="menu-cat">${esc(group.cat.toUpperCase())}</div>
+     <div class="menu-grid">${group.items.map(item =>
+       `<div class="mi-wrap" data-wrap="${esc(item)}">
+          <button class="mi" data-item="${esc(item)}"><span>${esc(item)}</span><span class="qty"></span></button>
+          <button class="mminus" data-minus="${esc(item)}" aria-label="Remove one ${esc(item)}">−</button>
+        </div>`).join('')}</div>`).join('');
+  refreshSheet();
+}
+
+function refreshSheet(){
+  document.querySelectorAll('.tbl').forEach(b => b.classList.toggle('on', +b.dataset.table === draft.table));
+  document.querySelectorAll('.mi-wrap').forEach(w => {
+    const name = w.dataset.wrap, q = draft.counts[name] || 0;
+    w.classList.toggle('on', q > 0);
+    w.querySelector('.qty').textContent = q || '';
+    w.querySelector('.mminus').style.visibility = q > 0 ? 'visible' : 'hidden';
+  });
+  const units = totalUnits();
+  $('#summary').textContent = draft.table
+    ? `Table ${draft.table} · ${units} item${units === 1 ? '' : 's'}`
+    : 'Tap a table, then the items';
+}
+
+$('#tables').addEventListener('click', e => {
+  const b = e.target.closest('.tbl');
+  if (!b) return;
+  draft.table = +b.dataset.table;
+  $('#err').textContent = '';
+  refreshSheet();
+});
+
+$('#menu').addEventListener('click', e => {
+  const minus = e.target.closest('.mminus');
+  const add = e.target.closest('.mi');
+  if (minus) {
+    const name = minus.dataset.minus;
+    if (draft.counts[name]) {
+      draft.counts[name]--;
+      if (!draft.counts[name]) delete draft.counts[name];
+    }
+  } else if (add) {
+    if (totalUnits() >= MAX_UNITS) { $('#err').textContent = `Maximum ${MAX_UNITS} items per order.`; shakeSheet(); return; }
+    const name = add.dataset.item;
+    draft.counts[name] = (draft.counts[name] || 0) + 1;
+  } else {
+    return;
+  }
+  $('#err').textContent = '';
+  refreshSheet();
+});
+
+function setPreset(min){
+  draftMin = min;
+  document.querySelectorAll('.preset').forEach(p => p.classList.toggle('on', +p.dataset.min === min));
+}
+$('#presets').addEventListener('click', e => {
+  const p = e.target.closest('.preset');
+  if (p) setPreset(+p.dataset.min);
+});
+
+function openAdd(){
+  draft = {table: null, counts: {}};
+  $('#err').textContent = '';
+  setPreset(10);
+  buildSheet();
+  $('#modal').classList.add('show');
+  animate($('#sheet'), {y: 30, opacity: 0}, {y: 0, opacity: 1, duration: .35, ease: 'power3.out'});
+}
+function closeAdd(){ $('#modal').classList.remove('show'); }
+$('#add-btn').addEventListener('click', openAdd);
+$('#cancel').addEventListener('click', closeAdd);
+
+$('#create').addEventListener('click', () => {
+  if (!draft.table) { $('#err').textContent = 'Tap a table number.'; shakeSheet(); return; }
+  if (!totalUnits()) { $('#err').textContent = 'Tap at least one menu item.'; shakeSheet(); return; }
+  // Expand counts into one row per portion, so each one can be ticked off separately
+  const items = Object.entries(draft.counts).flatMap(([name, qty]) =>
+    Array.from({length: qty}, () => ({text: name, done: false})));
+  const total = draftMin * 60000;
+  orders.push({id: seq++, table: draft.table, items, total, due: Date.now() + total});
+  SFX.add();
+  closeAdd();
+  flipRender();
+});
+
+function shakeSheet(){
+  const sh = $('#sheet');
+  sh.classList.remove('bad'); void sh.offsetWidth; sh.classList.add('bad');
+}
+
+// Sample orders so every urgency state shows on load (remove this block for a blank board)
+[
+  {table: 4,  items: ['Burger', 'Burger', 'Fries', 'Onion rings'], total: 600,  offset: -120},
+  {table: 7,  items: ['Margherita pizza', 'Garlic bread'], total: 900, offset: 200},
+  {table: 9,  items: ['Carbonara', 'Iced coffee', 'Iced coffee', 'Tiramisu'], total: 1200, offset: 720},
+  {table: 11, items: ['Flat white', 'Flat white', 'Pancakes'], total: 1800, offset: 1080}
+].forEach(s => orders.push({
+  id: seq++,
+  table: s.table,
+  items: s.items.map(text => ({text, done: false})),
+  total: s.total * 1000,
+  due: Date.now() + s.offset * 1000
+}));
+
+checkLate(true);
+render();
+syncAlarm();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
